@@ -7,6 +7,7 @@ const ExtractJwt = require('passport-jwt').ExtractJwt
 const GoogleStrategy = require('passport-google-oauth20').Strategy
 const OpenIDConnectStrategy = require('passport-openidconnect')
 const Database = require('./Database')
+const User = require('./objects/user/User')
 
 /**
  * @class Class for handling all the authentication related functionality.
@@ -42,14 +43,19 @@ class Auth {
       passport.use(new GoogleStrategy({
         clientID: global.ServerSettings.authGoogleOauth20ClientID,
         clientSecret: global.ServerSettings.authGoogleOauth20ClientSecret,
-        callbackURL: global.ServerSettings.authGoogleOauth20CallbackURL
+        callbackURL: global.ServerSettings.authGoogleOauth20CallbackURL,
+        userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo",
+        scope: ['given_name', 'email'] //TODO: do not get the given name
       }, (async function (accessToken, refreshToken, profile, done) {
-        // TODO: do we want to create the users which does not exist?
-
         // get user by email
-        const user = await Database.userModel.getUserByEmail(profile.emails[0].value.toLowerCase())
+        const email = profile.emails[0].value.toLowerCase()
+        const user = await Database.userModel.getUserByEmail(email)
 
-        if (!user || !user.isActive) {
+        if (!user && global.ServerSettings.authAutoUserCreation) {
+          // create the user automatically
+          this.createNewUserViaEmail(email, email.replace('@', '_').replace('.', '_'))
+        }
+        else if (!user || !user.isActive) {
           // deny login
           done(null, null)
           return
@@ -75,9 +81,15 @@ class Auth {
       }, async (issuer, profile, done) => {
         // TODO: do we want to create the users which does not exist?
 
-        const user = await Database.userModel.getUserByUsername(profile.username)
+        // get user by email
+        const email = profile.emails[0].value.toLowerCase()
+        var user = await Database.userModel.getUserByEmail(email)
 
-        if (!user?.isActive) {
+        if (!user && global.ServerSettings.authAutoUserCreation) {
+          // create the user automatically
+          this.createNewUserViaEmail(email, profile.username)
+        }
+        else if (!user?.isActive) {
           // deny login
           done(null, null)
           return
@@ -393,6 +405,50 @@ class Auth {
       ereaderDevices: Database.emailSettings.getEReaderDevices(user),
       Source: global.Source
     }
+  }
+
+  async createNewUserViaEmail(email, requestedUsername) {
+    // check if user anlready exists
+    var user = await Database.userModel.getUserByEmail(email)
+    if (user) {
+      // user already exists
+      return null
+    }
+
+    // Find a free username
+    var username = requestedUsername
+    var i = 1
+    do {
+      var usernameExists = await Database.userModel.getUserByUsername(username)
+      if (!usernameExists) {
+        break;
+      }
+      username = `requestedUsername${i}`
+      i = i + 1
+    }
+    while (true)
+
+    const newUserData = {
+      id: uuidv4(),
+      username: username,
+      type: "user",
+      pash: await this.hashPass(account.password),
+      createdAt: Date.now(),
+      isActive: true,
+      isLocked: false,
+    }
+
+    newUserData.token = await this.generateAccessToken(newUserData)
+
+    const newUser = new User(account)
+
+    const success = await Database.createUser(newUser)
+    if (success) {
+      return newUser
+    } else {
+      return null
+    }
+
   }
 }
 

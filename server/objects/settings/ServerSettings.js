@@ -57,6 +57,8 @@ class ServerSettings {
     // Auth settings
     // Active auth methodes
     this.authActiveAuthMethods = ['local']
+    // Auto user creation
+    this.authAutoUserCreation = false
 
     // google-oauth20 settings
     this.authGoogleOauth20ClientID = ''
@@ -114,6 +116,7 @@ class ServerSettings {
     this.buildNumber = settings.buildNumber || 0 // Added v2.4.5
 
     this.authActiveAuthMethods = settings.authActiveAuthMethods || ['local']
+    this.authAutoUserCreation = settings.authAutoUserCreation || false
     this.authGoogleOauth20ClientID = settings.authGoogleOauth20ClientID || ''
     this.authGoogleOauth20ClientSecret = settings.authGoogleOauth20ClientSecret || ''
     this.authGoogleOauth20CallbackURL = settings.authGoogleOauth20CallbackURL || ''
@@ -217,6 +220,7 @@ class ServerSettings {
       version: this.version,
       buildNumber: this.buildNumber,
       authActiveAuthMethods: this.authActiveAuthMethods,
+      authAutoUserCreation: this.authAutoUserCreation,
       authGoogleOauth20ClientID: this.authGoogleOauth20ClientID, // Do not return to client
       authGoogleOauth20ClientSecret: this.authGoogleOauth20ClientSecret, // Do not return to client
       authGoogleOauth20CallbackURL: this.authGoogleOauth20CallbackURL,
